@@ -1,11 +1,14 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { supabase } from "../lib/supabase";
 
 type Entry = {
+  id: string;
   person: string;
   amount: number;
   type: "toMe" | "iOwe";
+  created_at: string;
 };
 
 export default function Home() {
@@ -14,38 +17,68 @@ export default function Home() {
   const [type, setType] = useState<"toMe" | "iOwe">("toMe");
   const [entries, setEntries] = useState<Entry[]>([]);
 
-  // 🔹 Beim Laden Daten aus localStorage holen
+  // 🔹 Daten beim Laden aus Supabase holen
   useEffect(() => {
-    const saved = localStorage.getItem("entries");
-    if (saved) {
-      setEntries(JSON.parse(saved));
-    }
-  }, []);
+    const fetchEntries = async () => {
+      const { data, error } = await supabase
+        .from("entries")
+        .select("*")
+        .order("created_at", { ascending: false });
 
-  // 🔹 Bei Änderung speichern
-  useEffect(() => {
-    localStorage.setItem("entries", JSON.stringify(entries));
-  }, [entries]);
-
-  const addEntry = () => {
-    if (!person || !amount) return;
-
-    const newEntry: Entry = {
-      person,
-      amount: Number(amount),
-      type,
+      if (error) {
+        console.error("DB ERROR:", error);
+      } else {
+        setEntries(data || []);
+      }
     };
 
-    setEntries([...entries, newEntry]);
+    fetchEntries();
+  }, []);
+
+  // 🔹 Neuen Eintrag hinzufügen
+  const addEntry = async () => {
+    if (!person || !amount) return;
+
+    const { data, error } = await supabase
+      .from("entries")
+      .insert([
+        {
+          person,
+          amount: Number(amount),
+          type,
+        },
+      ])
+      .select();
+
+    if (error) {
+      console.error("Insert error:", error);
+      return;
+    }
+
+    if (data) {
+      setEntries([data[0], ...entries]);
+    }
+
     setPerson("");
     setAmount("");
   };
 
-  const deleteEntry = (index: number) => {
-  const updated = entries.filter((_, i) => i !== index);
-  setEntries(updated);
-};
+  // 🔹 Eintrag löschen
+  const deleteEntry = async (id: string) => {
+    const { error } = await supabase
+      .from("entries")
+      .delete()
+      .eq("id", id);
 
+    if (error) {
+      console.error("Delete error:", error);
+      return;
+    }
+
+    setEntries(entries.filter((entry) => entry.id !== id));
+  };
+
+  // 🔹 Summen berechnen
   const toMeTotal = entries
     .filter((e) => e.type === "toMe")
     .reduce((sum, e) => sum + e.amount, 0);
@@ -126,34 +159,35 @@ export default function Home() {
               Noch keine Einträge.
             </p>
           ) : (
-            entries.map((entry, index) => (
-  <div
-    key={index}
-    className="flex justify-between items-center border-b py-2"
-  >
-    <span>
-      {entry.person} (
-      {entry.type === "toMe"
-        ? "schuldet mir"
-        : "ich schulde"})
-    </span>
+            entries.map((entry) => (
+              <div
+                key={entry.id}
+                className="flex justify-between items-center border-b py-2"
+              >
+                <span>
+                  {entry.person} (
+                  {entry.type === "toMe"
+                    ? "schuldet mir"
+                    : "ich schulde"}
+                  )
+                </span>
 
-    <div className="flex items-center gap-3">
-      <span>{entry.amount} €</span>
+                <div className="flex items-center gap-3">
+                  <span>{entry.amount} €</span>
 
-      <button
-        onClick={() => deleteEntry(index)}
-        className="text-red-600 hover:text-red-800 text-sm"
-      >
-        Löschen
-      </button>
-    </div>
-  </div>
-))
-
+                  <button
+                    onClick={() => deleteEntry(entry.id)}
+                    className="text-red-600 hover:text-red-800 text-sm"
+                  >
+                    Löschen
+                  </button>
+                </div>
+              </div>
+            ))
           )}
         </div>
       </div>
     </main>
   );
 }
+
