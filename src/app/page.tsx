@@ -1,5 +1,4 @@
 "use client";
-
 export const dynamic = "force-dynamic";
 
 import { useState, useEffect } from "react";
@@ -15,14 +14,13 @@ type Entry = {
   created_at: string;
 };
 
-
 export default function Home() {
   const [person, setPerson] = useState("");
   const [amount, setAmount] = useState("");
   const [type, setType] = useState<"toMe" | "iOwe">("toMe");
   const [entries, setEntries] = useState<Entry[]>([]);
 
-  // 🔹 Daten beim Laden aus Supabase holen
+  // 🔹 Daten laden
   useEffect(() => {
     const fetchEntries = async () => {
       const { data, error } = await supabase
@@ -30,17 +28,15 @@ export default function Home() {
         .select("*")
         .order("created_at", { ascending: false });
 
-      if (error) {
-        console.error("DB ERROR:", error);
-      } else {
-        setEntries(data || []);
+      if (!error && data) {
+        setEntries(data as Entry[]);
       }
     };
 
     fetchEntries();
   }, []);
 
-  // 🔹 Neuen Eintrag hinzufügen
+  // 🔹 Neuer Eintrag
   const addEntry = async () => {
     if (!person || !amount) return;
 
@@ -57,67 +53,84 @@ export default function Home() {
       ])
       .select();
 
-    if (error) {
-      console.error("Insert error:", error);
-      return;
-    }
-
-    if (data) {
-      setEntries([data[0], ...entries]);
+    if (!error && data) {
+      setEntries([data[0] as Entry, ...entries]);
     }
 
     setPerson("");
     setAmount("");
   };
 
-  const addPayment = async (entry: Entry, payment: number) => {
-  const newPaidAmount = entry.paid_amount + payment;
-  const newStatus =
-    newPaidAmount >= entry.amount ? "paid" : "open";
-
-  const { error } = await supabase
-    .from("entries")
-    .update({
-      paid_amount: newPaidAmount,
-      status: newStatus,
-    })
-    .eq("id", entry.id);
-
-  if (!error) {
-    setEntries((prev) =>
-      prev.map((e) =>
-        e.id === entry.id
-          ? { ...e, paid_amount: newPaidAmount, status: newStatus }
-          : e
-      )
-    );
-  }
-};
-
-
-  // 🔹 Eintrag löschen
+  // 🔹 Löschen
   const deleteEntry = async (id: string) => {
     const { error } = await supabase
       .from("entries")
       .delete()
       .eq("id", id);
 
-    if (error) {
-      console.error("Delete error:", error);
-      return;
+    if (!error) {
+      setEntries(entries.filter((e) => e.id !== id));
     }
-
-    setEntries(entries.filter((entry) => entry.id !== id));
   };
 
-  // 🔹 Summen berechnen
+  // 🔹 Als bezahlt markieren
+  const markAsPaid = async (entry: Entry) => {
+    const { error } = await supabase
+      .from("entries")
+      .update({
+        paid_amount: entry.amount,
+        status: "paid",
+      })
+      .eq("id", entry.id);
+
+    if (!error) {
+      setEntries((prev) =>
+        prev.map((e) =>
+          e.id === entry.id
+            ? { ...e, paid_amount: e.amount, status: "paid" }
+            : e
+        )
+      );
+    }
+  };
+
+  // 🔹 Teilzahlung
+  const addPayment = async (entry: Entry, payment: number) => {
+    const newPaidAmount = entry.paid_amount + payment;
+    const newStatus =
+      newPaidAmount >= entry.amount ? "paid" : "open";
+
+    const { error } = await supabase
+      .from("entries")
+      .update({
+        paid_amount: newPaidAmount,
+        status: newStatus,
+      })
+      .eq("id", entry.id);
+
+    if (!error) {
+      setEntries((prev) =>
+        prev.map((e) =>
+          e.id === entry.id
+            ? {
+                ...e,
+                paid_amount: newPaidAmount,
+                status: newStatus,
+              }
+            : e
+        )
+      );
+    }
+  };
+
+  // 🔹 Summen
   const toMeTotal = entries
     .filter((e) => e.type === "toMe")
-    .reduce((sum, e) => sum + e.amount, 0);
+    .reduce((sum, e) => sum + (e.amount - e.paid_amount), 0);
 
   const iOweTotal = entries
     .filter((e) => e.type === "iOwe")
-    .reduce((sum, e) => sum + e.amount, 0);
+    .reduce((sum, e) => sum + (e.amount - e.paid_amount), 0);
 
   return (
     <main className="min-h-screen bg-gray-100 p-6 text-black">
@@ -194,37 +207,78 @@ export default function Home() {
             entries.map((entry) => (
               <div
                 key={entry.id}
-                className="flex justify-between items-center border-b py-2"
+                className="border-b py-3"
               >
-                <span>
-                  {entry.person} (
-                  {entry.type === "toMe"
-                    ? "schuldet mir"
-                    : "ich schulde"}
-                  )
-                </span>
+                <div className="flex justify-between items-center">
+                  <span>
+                    {entry.person} (
+                    {entry.type === "toMe"
+                      ? "schuldet mir"
+                      : "ich schulde"}
+                    )
+                  </span>
 
-                <div className="flex items-center gap-3">
-  <div className="text-right">
-    <div>
-      {entry.amount - entry.paid_amount} € offen
-    </div>
+                  <div className="text-right">
+                    <div>
+                      {entry.amount - entry.paid_amount} € offen
+                    </div>
 
-    {entry.status === "paid" && (
-      <div className="text-green-600 text-sm">
-        Bezahlt ✅
-      </div>
-    )}
-  </div>
+                    {entry.status === "paid" && (
+                      <div className="text-green-600 text-sm">
+                        Bezahlt ✅
+                      </div>
+                    )}
+                  </div>
+                </div>
 
-  <button
-    onClick={() => deleteEntry(entry.id)}
-    className="text-red-600 hover:text-red-800 text-sm"
-  >
-    Löschen
-  </button>
-</div>
+                {/* Aktionen */}
+                <div className="flex gap-3 mt-2 flex-wrap">
+                  {entry.status !== "paid" && (
+                    <button
+                      onClick={() =>
+                        markAsPaid(entry)
+                      }
+                      className="text-green-600 text-sm"
+                    >
+                      Als bezahlt markieren
+                    </button>
+                  )}
 
+                  <button
+                    onClick={() =>
+                      deleteEntry(entry.id)
+                    }
+                    className="text-red-600 text-sm"
+                  >
+                    Löschen
+                  </button>
+
+                  {entry.status !== "paid" && (
+                    <input
+                      type="number"
+                      placeholder="Teilzahlung"
+                      className="border p-1 text-sm w-28"
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          const value = Number(
+                            (
+                              e.target as HTMLInputElement
+                            ).value
+                          );
+                          if (value > 0) {
+                            addPayment(
+                              entry,
+                              value
+                            );
+                            (
+                              e.target as HTMLInputElement
+                            ).value = "";
+                          }
+                        }
+                      }}
+                    />
+                  )}
+                </div>
               </div>
             ))
           )}
