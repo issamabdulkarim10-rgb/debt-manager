@@ -9,9 +9,12 @@ type Entry = {
   id: string;
   person: string;
   amount: number;
+  paid_amount: number;
+  status: "open" | "paid";
   type: "toMe" | "iOwe";
   created_at: string;
 };
+
 
 export default function Home() {
   const [person, setPerson] = useState("");
@@ -47,6 +50,8 @@ export default function Home() {
         {
           person,
           amount: Number(amount),
+          paid_amount: 0,
+          status: "open",
           type,
         },
       ])
@@ -64,6 +69,31 @@ export default function Home() {
     setPerson("");
     setAmount("");
   };
+
+  const addPayment = async (entry: Entry, payment: number) => {
+  const newPaidAmount = entry.paid_amount + payment;
+  const newStatus =
+    newPaidAmount >= entry.amount ? "paid" : "open";
+
+  const { error } = await supabase
+    .from("entries")
+    .update({
+      paid_amount: newPaidAmount,
+      status: newStatus,
+    })
+    .eq("id", entry.id);
+
+  if (!error) {
+    setEntries((prev) =>
+      prev.map((e) =>
+        e.id === entry.id
+          ? { ...e, paid_amount: newPaidAmount, status: newStatus }
+          : e
+      )
+    );
+  }
+};
+
 
   // 🔹 Eintrag löschen
   const deleteEntry = async (id: string) => {
@@ -175,15 +205,26 @@ export default function Home() {
                 </span>
 
                 <div className="flex items-center gap-3">
-                  <span>{entry.amount} €</span>
+  <div className="text-right">
+    <div>
+      {entry.amount - entry.paid_amount} € offen
+    </div>
 
-                  <button
-                    onClick={() => deleteEntry(entry.id)}
-                    className="text-red-600 hover:text-red-800 text-sm"
-                  >
-                    Löschen
-                  </button>
-                </div>
+    {entry.status === "paid" && (
+      <div className="text-green-600 text-sm">
+        Bezahlt ✅
+      </div>
+    )}
+  </div>
+
+  <button
+    onClick={() => deleteEntry(entry.id)}
+    className="text-red-600 hover:text-red-800 text-sm"
+  >
+    Löschen
+  </button>
+</div>
+
               </div>
             ))
           )}
