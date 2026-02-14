@@ -315,7 +315,7 @@ function Login({ onLogin }: any) {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
       <div className="bg-white border shadow-sm p-8 rounded-xl w-80">
-        <h2 className="text-xl font-bold mb-6 text-center">
+        <h2 className="text-xl font-bold mb-6 text-center text-gray-700">
           Login
         </h2>
 
@@ -324,7 +324,7 @@ function Login({ onLogin }: any) {
           placeholder="Email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          className="w-full border p-2 rounded mb-3"
+          className="w-full border p-2 rounded mb-3 text-black"
         />
 
         <input
@@ -332,12 +332,12 @@ function Login({ onLogin }: any) {
           placeholder="Passwort"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          className="w-full border p-2 rounded mb-4"
+          className="w-full border p-2 rounded mb-4 text-black"
         />
 
         <button
           onClick={handleLogin}
-          className="w-full bg-blue-600 text-white p-2 rounded hover:bg-blue-700"
+          className="w-full bg-blue-600 text-white p-2 rounded hover:bg-blue-700 "
         >
           Einloggen
         </button>
