@@ -11,71 +11,106 @@ type Entry = {
   paid_amount: number;
   status: "open" | "paid";
   type: "toMe" | "iOwe";
+  user_id: string;
   created_at: string;
 };
 
 export default function Home() {
+  const [user, setUser] = useState<any>(null);
+  const [entries, setEntries] = useState<Entry[]>([]);
   const [person, setPerson] = useState("");
   const [amount, setAmount] = useState("");
   const [type, setType] = useState<"toMe" | "iOwe">("toMe");
-  const [entries, setEntries] = useState<Entry[]>([]);
 
-  // 🔹 Daten laden
+  // 🔐 Session prüfen
   useEffect(() => {
-    const fetchEntries = async () => {
-      const { data, error } = await supabase
-        .from("entries")
-        .select("*")
-        .order("created_at", { ascending: false });
-
-      if (!error && data) {
-        setEntries(data as Entry[]);
-      }
+    const getSession = async () => {
+      const { data } = await supabase.auth.getSession();
+      setUser(data.session?.user ?? null);
     };
 
-    fetchEntries();
+    getSession();
+
+    const { data: listener } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        setUser(session?.user ?? null);
+      }
+    );
+
+    return () => {
+      listener.subscription.unsubscribe();
+    };
   }, []);
 
-  // 🔹 Neuer Eintrag
-  const addEntry = async () => {
-    if (!person || !amount) return;
+  // 📥 Daten laden
+  useEffect(() => {
+  fetchEntries();
+}, []);
 
-    const { data, error } = await supabase
-      .from("entries")
-      .insert([
-        {
-          person,
-          amount: Number(amount),
-          paid_amount: 0,
-          status: "open",
-          type,
-        },
-      ])
-      .select();
 
-    if (!error && data) {
-      setEntries([data[0] as Entry, ...entries]);
-    }
+    const fetchEntries = async () => {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
-    setPerson("");
-    setAmount("");
-  };
+  if (!user) return;
 
-  // 🔹 Löschen
+  const { data, error } = await supabase
+    .from("entries")
+    .select("*")
+    .eq("user_id", user.id)
+    .order("created_at", { ascending: false });
+
+  if (!error) setEntries(data || []);
+};
+
+
+  // ➕ Eintrag hinzufügen
+const addEntry = async () => {
+  if (!person || !amount) return;
+
+  // 🔐 Aktuell eingeloggten User holen
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    alert("Nicht eingeloggt!");
+    return;
+  }
+
+  // 📦 In Supabase speichern
+  const { error } = await supabase.from("entries").insert([
+    {
+      person,
+      amount: Number(amount),
+      type,
+      user_id: user.id, // 🔥 WICHTIG
+    },
+  ]);
+
+  if (error) {
+    console.error("Insert error:", error);
+    return;
+  }
+
+  // 🔄 Danach neu laden
+  fetchEntries();
+
+  setPerson("");
+  setAmount("");
+};
+
+
+  // ❌ Löschen
   const deleteEntry = async (id: string) => {
-    const { error } = await supabase
-      .from("entries")
-      .delete()
-      .eq("id", id);
-
-    if (!error) {
-      setEntries(entries.filter((e) => e.id !== id));
-    }
+    await supabase.from("entries").delete().eq("id", id);
+    setEntries(entries.filter((e) => e.id !== id));
   };
 
-  // 🔹 Als bezahlt markieren
+  // ✅ Als bezahlt markieren
   const markAsPaid = async (entry: Entry) => {
-    const { error } = await supabase
+    await supabase
       .from("entries")
       .update({
         paid_amount: entry.amount,
@@ -83,24 +118,22 @@ export default function Home() {
       })
       .eq("id", entry.id);
 
-    if (!error) {
-      setEntries((prev) =>
-        prev.map((e) =>
-          e.id === entry.id
-            ? { ...e, paid_amount: e.amount, status: "paid" }
-            : e
-        )
-      );
-    }
+    setEntries((prev) =>
+      prev.map((e) =>
+        e.id === entry.id
+          ? { ...e, paid_amount: e.amount, status: "paid" }
+          : e
+      )
+    );
   };
 
-  // 🔹 Teilzahlung
+  // 💰 Teilzahlung
   const addPayment = async (entry: Entry, payment: number) => {
     const newPaidAmount = entry.paid_amount + payment;
     const newStatus =
       newPaidAmount >= entry.amount ? "paid" : "open";
 
-    const { error } = await supabase
+    await supabase
       .from("entries")
       .update({
         paid_amount: newPaidAmount,
@@ -108,22 +141,20 @@ export default function Home() {
       })
       .eq("id", entry.id);
 
-    if (!error) {
-      setEntries((prev) =>
-        prev.map((e) =>
-          e.id === entry.id
-            ? {
-                ...e,
-                paid_amount: newPaidAmount,
-                status: newStatus,
-              }
-            : e
-        )
-      );
-    }
+    setEntries((prev) =>
+      prev.map((e) =>
+        e.id === entry.id
+          ? {
+              ...e,
+              paid_amount: newPaidAmount,
+              status: newStatus,
+            }
+          : e
+      )
+    );
   };
 
-  // 🔹 Summen
+  // 📊 Summen
   const toMeTotal = entries
     .filter((e) => e.type === "toMe")
     .reduce((sum, e) => sum + (e.amount - e.paid_amount), 0);
@@ -132,12 +163,26 @@ export default function Home() {
     .filter((e) => e.type === "iOwe")
     .reduce((sum, e) => sum + (e.amount - e.paid_amount), 0);
 
+  // 🔒 Wenn nicht eingeloggt → Login anzeigen
+  if (!user) {
+    return <Login onLogin={setUser} />;
+  }
+
   return (
     <main className="min-h-screen bg-gray-100 p-6 text-black">
       <div className="max-w-2xl mx-auto">
-        <h1 className="text-3xl font-bold mb-6 text-center">
-          Schulden-Manager
-        </h1>
+
+        <div className="flex justify-between mb-4">
+          <h1 className="text-2xl font-bold">Schulden-Manager</h1>
+          <button
+            onClick={async () => {
+              await supabase.auth.signOut();
+            }}
+            className="text-sm text-gray-600"
+          >
+            Logout
+          </button>
+        </div>
 
         {/* Formular */}
         <div className="bg-white p-6 rounded-xl shadow mb-6">
@@ -170,7 +215,7 @@ export default function Home() {
 
           <button
             onClick={addEntry}
-            className="w-full bg-blue-600 text-white p-2 rounded hover:bg-blue-700"
+            className="w-full bg-blue-600 text-white p-2 rounded"
           >
             Hinzufügen
           </button>
@@ -179,19 +224,15 @@ export default function Home() {
         {/* Übersicht */}
         <div className="grid grid-cols-2 gap-4 mb-6">
           <div className="bg-green-100 p-4 rounded-xl text-center">
-            <p className="text-sm text-gray-600">
-              Andere schulden mir
-            </p>
-            <p className="text-xl font-bold text-green-700">
+            <p>Andere schulden mir</p>
+            <p className="font-bold text-green-700">
               {toMeTotal} €
             </p>
           </div>
 
           <div className="bg-red-100 p-4 rounded-xl text-center">
-            <p className="text-sm text-gray-600">
-              Ich schulde anderen
-            </p>
-            <p className="text-xl font-bold text-red-700">
+            <p>Ich schulde anderen</p>
+            <p className="font-bold text-red-700">
               {iOweTotal} €
             </p>
           </div>
@@ -199,61 +240,39 @@ export default function Home() {
 
         {/* Liste */}
         <div className="bg-white p-6 rounded-xl shadow">
-          {entries.length === 0 ? (
-            <p className="text-gray-500">
-              Noch keine Einträge.
-            </p>
-          ) : (
-            entries.map((entry) => (
-              <div
-                key={entry.id}
-                className="border-b py-3"
-              >
-                <div className="flex justify-between items-center">
-                  <span>
-                    {entry.person} (
-                    {entry.type === "toMe"
-                      ? "schuldet mir"
-                      : "ich schulde"}
-                    )
-                  </span>
+          {entries.map((entry) => (
+            <div key={entry.id} className="border-b py-3">
+              <div className="flex justify-between">
+                <span>
+                  {entry.person} (
+                  {entry.type === "toMe"
+                    ? "schuldet mir"
+                    : "ich schulde"}
+                  )
+                </span>
 
-                  <div className="text-right">
-                    <div>
-                      {entry.amount - entry.paid_amount} € offen
-                    </div>
-
-                    {entry.status === "paid" && (
-                      <div className="text-green-600 text-sm">
-                        Bezahlt ✅
-                      </div>
-                    )}
+                <div className="text-right">
+                  <div>
+                    {entry.amount - entry.paid_amount} € offen
                   </div>
+                  {entry.status === "paid" && (
+                    <div className="text-green-600 text-sm">
+                      Bezahlt ✅
+                    </div>
+                  )}
                 </div>
+              </div>
 
-                {/* Aktionen */}
-                <div className="flex gap-3 mt-2 flex-wrap">
-                  {entry.status !== "paid" && (
+              <div className="flex gap-3 mt-2 flex-wrap">
+                {entry.status !== "paid" && (
+                  <>
                     <button
-                      onClick={() =>
-                        markAsPaid(entry)
-                      }
+                      onClick={() => markAsPaid(entry)}
                       className="text-green-600 text-sm"
                     >
                       Als bezahlt markieren
                     </button>
-                  )}
 
-                  <button
-                    onClick={() =>
-                      deleteEntry(entry.id)
-                    }
-                    className="text-red-600 text-sm"
-                  >
-                    Löschen
-                  </button>
-
-                  {entry.status !== "paid" && (
                     <input
                       type="number"
                       placeholder="Teilzahlung"
@@ -266,10 +285,7 @@ export default function Home() {
                             ).value
                           );
                           if (value > 0) {
-                            addPayment(
-                              entry,
-                              value
-                            );
+                            addPayment(entry, value);
                             (
                               e.target as HTMLInputElement
                             ).value = "";
@@ -277,14 +293,72 @@ export default function Home() {
                         }
                       }}
                     />
-                  )}
-                </div>
+                  </>
+                )}
+
+                <button
+                  onClick={() => deleteEntry(entry.id)}
+                  className="text-red-600 text-sm"
+                >
+                  Löschen
+                </button>
               </div>
-            ))
-          )}
+            </div>
+          ))}
         </div>
       </div>
     </main>
   );
 }
 
+function Login({ onLogin }: any) {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+
+  const handleLogin = async () => {
+    const { data, error } =
+      await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+    if (!error && data.user) {
+      onLogin(data.user);
+    } else {
+      alert("Login fehlgeschlagen");
+    }
+  };
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-100">
+      <div className="bg-white p-6 rounded-xl shadow w-80">
+        <h2 className="text-xl font-bold mb-4 text-center">
+          Login
+        </h2>
+
+        <input
+          type="email"
+          placeholder="Email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          className="w-full border p-2 rounded mb-3"
+        />
+
+        <input
+          type="password"
+          placeholder="Passwort"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          className="w-full border p-2 rounded mb-3"
+        />
+
+        <button
+          onClick={handleLogin}
+          className="w-full bg-blue-600 text-white p-2 rounded"
+        >
+          Einloggen
+        </button>
+      </div>
+    </div>
+  );
+}
