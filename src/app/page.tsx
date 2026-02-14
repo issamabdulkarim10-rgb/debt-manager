@@ -224,14 +224,14 @@ const addEntry = async () => {
         {/* Übersicht */}
         <div className="grid grid-cols-2 gap-4 mb-6">
           <div className="bg-green-100 p-4 rounded-xl text-center">
-            <p>Andere schulden mir</p>
+            <p>ich bekomme</p>
             <p className="font-bold text-green-700">
               {toMeTotal} €
             </p>
           </div>
 
           <div className="bg-red-100 p-4 rounded-xl text-center">
-            <p>Ich schulde anderen</p>
+            <p>Ich schulde</p>
             <p className="font-bold text-red-700">
               {iOweTotal} €
             </p>
@@ -341,7 +341,7 @@ function Login({ onLogin }: any) {
           placeholder="Email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          className="w-full border p-2 rounded mb-3"
+          className="w-full border p-2 rounded mb-3 text-black"
         />
 
         <input
@@ -349,12 +349,12 @@ function Login({ onLogin }: any) {
           placeholder="Passwort"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          className="w-full border p-2 rounded mb-3"
+          className="w-full border p-2 rounded mb-3 text-black"
         />
 
         <button
           onClick={handleLogin}
-          className="w-full bg-blue-600 text-white p-2 rounded"
+          className="w-full bg-blue-600 text-black p-2 rounded"
         >
           Einloggen
         </button>
