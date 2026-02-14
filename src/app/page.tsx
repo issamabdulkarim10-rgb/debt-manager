@@ -42,65 +42,46 @@ export default function Home() {
     };
   }, []);
 
-  // 📥 Daten laden
+  // 📥 Einträge laden
+  const fetchEntries = async () => {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) return;
+
+    const { data } = await supabase
+      .from("entries")
+      .select("*")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false });
+
+    setEntries(data || []);
+  };
+
   useEffect(() => {
-  fetchEntries();
-}, []);
-
-
-    const fetchEntries = async () => {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) return;
-
-  const { data, error } = await supabase
-    .from("entries")
-    .select("*")
-    .eq("user_id", user.id)
-    .order("created_at", { ascending: false });
-
-  if (!error) setEntries(data || []);
-};
-
+    if (user) fetchEntries();
+  }, [user]);
 
   // ➕ Eintrag hinzufügen
-const addEntry = async () => {
-  if (!person || !amount) return;
+  const addEntry = async () => {
+    if (!person || !amount || !user) return;
 
-  // 🔐 Aktuell eingeloggten User holen
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+    await supabase.from("entries").insert([
+      {
+        person,
+        amount: Number(amount),
+        paid_amount: 0,
+        status: "open",
+        type,
+        user_id: user.id,
+      },
+    ]);
 
-  if (!user) {
-    alert("Nicht eingeloggt!");
-    return;
-  }
-
-  // 📦 In Supabase speichern
-  const { error } = await supabase.from("entries").insert([
-    {
-      person,
-      amount: Number(amount),
-      type,
-      user_id: user.id, // 🔥 WICHTIG
-    },
-  ]);
-
-  if (error) {
-    console.error("Insert error:", error);
-    return;
-  }
-
-  // 🔄 Danach neu laden
-  fetchEntries();
-
-  setPerson("");
-  setAmount("");
-};
-
+    fetchEntries();
+    setPerson("");
+    setAmount("");
+  };
 
   // ❌ Löschen
   const deleteEntry = async (id: string) => {
@@ -118,13 +99,7 @@ const addEntry = async () => {
       })
       .eq("id", entry.id);
 
-    setEntries((prev) =>
-      prev.map((e) =>
-        e.id === entry.id
-          ? { ...e, paid_amount: e.amount, status: "paid" }
-          : e
-      )
-    );
+    fetchEntries();
   };
 
   // 💰 Teilzahlung
@@ -141,17 +116,7 @@ const addEntry = async () => {
       })
       .eq("id", entry.id);
 
-    setEntries((prev) =>
-      prev.map((e) =>
-        e.id === entry.id
-          ? {
-              ...e,
-              paid_amount: newPaidAmount,
-              status: newStatus,
-            }
-          : e
-      )
-    );
+    fetchEntries();
   };
 
   // 📊 Summen
@@ -163,35 +128,38 @@ const addEntry = async () => {
     .filter((e) => e.type === "iOwe")
     .reduce((sum, e) => sum + (e.amount - e.paid_amount), 0);
 
-  // 🔒 Wenn nicht eingeloggt → Login anzeigen
+  // 🔒 Login anzeigen wenn nicht eingeloggt
   if (!user) {
     return <Login onLogin={setUser} />;
   }
 
   return (
-    <main className="min-h-screen bg-gray-100 p-6 text-black">
+    <main className="min-h-screen bg-white text-gray-900 p-8">
       <div className="max-w-2xl mx-auto">
 
-        <div className="flex justify-between mb-4">
-          <h1 className="text-2xl font-bold">Schulden-Manager</h1>
+        {/* Header */}
+        <div className="flex justify-between items-center mb-10">
+          <h1 className="text-3xl font-semibold tracking-tight">
+            Debt Manager
+          </h1>
           <button
             onClick={async () => {
               await supabase.auth.signOut();
             }}
-            className="text-sm text-gray-600"
+            className="text-sm text-gray-400 hover:text-black transition"
           >
             Logout
           </button>
         </div>
 
         {/* Formular */}
-        <div className="bg-white p-6 rounded-xl shadow mb-6">
+        <div className="border border-gray-200 p-6 rounded-2xl mb-8">
           <input
             type="text"
             placeholder="Name"
             value={person}
             onChange={(e) => setPerson(e.target.value)}
-            className="w-full border p-2 rounded mb-3"
+            className="w-full border border-gray-300 p-3 rounded-lg mb-4 focus:outline-none focus:border-black"
           />
 
           <input
@@ -199,7 +167,7 @@ const addEntry = async () => {
             placeholder="Betrag in €"
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
-            className="w-full border p-2 rounded mb-3"
+            className="w-full border border-gray-300 p-3 rounded-lg mb-4 focus:outline-none focus:border-black"
           />
 
           <select
@@ -207,101 +175,115 @@ const addEntry = async () => {
             onChange={(e) =>
               setType(e.target.value as "toMe" | "iOwe")
             }
-            className="w-full border p-2 rounded mb-3"
+            className="w-full border border-gray-300 p-3 rounded-lg mb-4 focus:outline-none focus:border-black"
           >
-            <option value="toMe">Andere schulden mir</option>
-            <option value="iOwe">Ich schulde anderen</option>
+            <option value="toMe">Forderung</option>
+            <option value="iOwe">Verbindlichkeit</option>
           </select>
 
           <button
             onClick={addEntry}
-            className="w-full bg-blue-600 text-white p-2 rounded"
+            className="w-full bg-black text-white p-3 rounded-lg hover:bg-gray-800 transition"
           >
             Hinzufügen
           </button>
         </div>
 
         {/* Übersicht */}
-        <div className="grid grid-cols-2 gap-4 mb-6">
-          <div className="bg-green-100 p-4 rounded-xl text-center">
-            <p>ich bekomme</p>
-            <p className="font-bold text-green-700">
+        <div className="grid grid-cols-2 gap-6 mb-10">
+          <div className="border border-gray-200 p-6 rounded-2xl">
+            <p className="text-sm text-gray-500 mb-1">Forderungen</p>
+            <p className="text-2xl font-semibold text-green-600">
               {toMeTotal} €
             </p>
           </div>
 
-          <div className="bg-red-100 p-4 rounded-xl text-center">
-            <p>Ich schulde</p>
-            <p className="font-bold text-red-700">
+          <div className="border border-gray-200 p-6 rounded-2xl">
+            <p className="text-sm text-gray-500 mb-1">
+              Verbindlichkeiten
+            </p>
+            <p className="text-2xl font-semibold text-red-600">
               {iOweTotal} €
             </p>
           </div>
         </div>
 
         {/* Liste */}
-        <div className="bg-white p-6 rounded-xl shadow">
+        <div className="border border-gray-200 rounded-2xl divide-y divide-gray-100">
           {entries.map((entry) => (
-            <div key={entry.id} className="border-b py-3">
-              <div className="flex justify-between">
-                <span>
-                  {entry.person} (
+            <div
+              key={entry.id}
+              className="p-5 flex justify-between items-center"
+            >
+              <div>
+                <div className="font-medium">
+                  {entry.person}
+                </div>
+                <div className="text-sm text-gray-400">
                   {entry.type === "toMe"
-                    ? "schuldet mir"
-                    : "ich schulde"}
-                  )
-                </span>
-
-                <div className="text-right">
-                  <div>
-                    {entry.amount - entry.paid_amount} € offen
-                  </div>
-                  {entry.status === "paid" && (
-                    <div className="text-green-600 text-sm">
-                      Bezahlt ✅
-                    </div>
-                  )}
+                    ? "Forderung"
+                    : "Verbindlichkeit"}
                 </div>
               </div>
 
-              <div className="flex gap-3 mt-2 flex-wrap">
-                {entry.status !== "paid" && (
-                  <>
-                    <button
-                      onClick={() => markAsPaid(entry)}
-                      className="text-green-600 text-sm"
-                    >
-                      Als bezahlt markieren
-                    </button>
+              <div className="text-right">
+                <div className="text-lg font-medium">
+                  {entry.amount - entry.paid_amount} €
+                </div>
 
-                    <input
-                      type="number"
-                      placeholder="Teilzahlung"
-                      className="border p-1 text-sm w-28"
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          const value = Number(
-                            (
-                              e.target as HTMLInputElement
-                            ).value
-                          );
-                          if (value > 0) {
-                            addPayment(entry, value);
-                            (
-                              e.target as HTMLInputElement
-                            ).value = "";
-                          }
-                        }
-                      }}
-                    />
-                  </>
+                {entry.status === "paid" && (
+                  <div className="text-sm text-green-600">
+                    Bezahlt
+                  </div>
                 )}
 
-                <button
-                  onClick={() => deleteEntry(entry.id)}
-                  className="text-red-600 text-sm"
-                >
-                  Löschen
-                </button>
+                <div className="flex gap-3 mt-2 justify-end text-sm">
+                  {entry.status !== "paid" && (
+                    <>
+                      <button
+                        onClick={() =>
+                          markAsPaid(entry)
+                        }
+                        className="text-gray-400 hover:text-black transition"
+                      >
+                        Bezahlt
+                      </button>
+
+                      <input
+                        type="number"
+                        placeholder="+ Zahlung"
+                        className="border border-gray-300 rounded px-2 py-1 w-24 focus:outline-none focus:border-black"
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            const value = Number(
+                              (
+                                e.target as HTMLInputElement
+                              ).value
+                            );
+                            if (value > 0) {
+                              addPayment(
+                                entry,
+                                value
+                              );
+                              (
+                                e.target as HTMLInputElement
+                              ).value = "";
+                            }
+                          }
+                        }}
+                      />
+                    </>
+                  )}
+
+                  <button
+                    onClick={() =>
+                      deleteEntry(entry.id)
+                    }
+                    className="text-gray-400 hover:text-red-600 transition"
+                  >
+                    Löschen
+                  </button>
+                </div>
               </div>
             </div>
           ))}
@@ -311,6 +293,7 @@ const addEntry = async () => {
   );
 }
 
+// 🔐 Login Component
 function Login({ onLogin }: any) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -330,9 +313,9 @@ function Login({ onLogin }: any) {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100">
-      <div className="bg-white p-6 rounded-xl shadow w-80">
-        <h2 className="text-xl font-bold mb-4 text-center text-black">
+    <div className="min-h-screen flex items-center justify-center bg-white">
+      <div className="border border-gray-200 p-8 rounded-2xl w-80">
+        <h2 className="text-xl font-semibold mb-6 text-center">
           Login
         </h2>
 
@@ -341,7 +324,7 @@ function Login({ onLogin }: any) {
           placeholder="Email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          className="w-full border p-2 rounded mb-3 text-black"
+          className="w-full border border-gray-300 p-3 rounded-lg mb-4 focus:outline-none focus:border-black"
         />
 
         <input
@@ -349,12 +332,12 @@ function Login({ onLogin }: any) {
           placeholder="Passwort"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          className="w-full border p-2 rounded mb-3 text-black"
+          className="w-full border border-gray-300 p-3 rounded-lg mb-4 focus:outline-none focus:border-black"
         />
 
         <button
           onClick={handleLogin}
-          className="w-full bg-blue-600 text-black p-2 rounded"
+          className="w-full bg-black text-white p-3 rounded-lg hover:bg-gray-800 transition"
         >
           Einloggen
         </button>
