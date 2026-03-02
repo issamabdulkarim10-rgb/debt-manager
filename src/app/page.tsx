@@ -88,23 +88,28 @@ export default function Home() {
 
   // 💰 Zahlung hinzufügen
   const addPayment = async (
-    entry: Entry,
-    paymentAmount: number,
-    date: string
-  ) => {
-    if (!user) return;
+  entry: Entry,
+  paymentAmount: number,
+  date: string
+) => {
+  if (!user) return;
 
-    await supabase.from("payments").insert([
-      {
-        entry_id: entry.id,
-        amount: paymentAmount,
-        payment_date: date,
-        user_id: user.id,
-      },
-    ]);
+  const { error } = await supabase
+    .from("payments")
+    .insert({
+      entry_id: entry.id,
+      amount: paymentAmount,
+      payment_date: date,
+      user_id: user.id,
+    });
 
-    fetchEntries();
-  };
+  if (error) {
+    console.error("Insert error:", error);
+    return;
+  }
+
+  fetchEntries();
+};
 
   // ❌ Löschen
   const deleteEntry = async (id: string) => {
