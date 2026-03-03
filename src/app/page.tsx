@@ -30,13 +30,24 @@ export default function Home() {
   const [note, setNote] = useState("");
   const [type, setType] = useState<"toMe" | "iOwe">("toMe");
 
-  // 🔐 Session prüfen
+  // 🔐 Auth Listener (wichtig für Logout!)
   useEffect(() => {
     const getSession = async () => {
       const { data } = await supabase.auth.getSession();
       setUser(data.session?.user ?? null);
     };
+
     getSession();
+
+    const { data: listener } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        setUser(session?.user ?? null);
+      }
+    );
+
+    return () => {
+      listener.subscription.unsubscribe();
+    };
   }, []);
 
   // 📥 Einträge laden
@@ -102,7 +113,7 @@ export default function Home() {
     fetchEntries();
   };
 
-  // 📊 Restbetrag berechnen
+  // 📊 Restbetrag
   const getRemaining = (entry: Entry) => {
     const totalPaid =
       entry.payments?.reduce((sum, p) => sum + p.amount, 0) || 0;
@@ -126,7 +137,7 @@ export default function Home() {
 
         {/* Header */}
         <div className="flex justify-between mb-8">
-          <h1 className="text-2xl font-bold">
+          <h1 className="text-2xl font-bold text-black">
             Schulden Manager
           </h1>
           <button
@@ -144,7 +155,7 @@ export default function Home() {
             placeholder="Name"
             value={person}
             onChange={(e) => setPerson(e.target.value)}
-            className="w-full border p-2 rounded mb-3"
+            className="w-full border p-2 rounded mb-3 text-black"
           />
 
           <input
@@ -152,7 +163,7 @@ export default function Home() {
             placeholder="Betrag in €"
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
-            className="w-full border p-2 rounded mb-3"
+            className="w-full border p-2 rounded mb-3 text-black"
           />
 
           <input
@@ -160,7 +171,7 @@ export default function Home() {
             placeholder="Vermerk (optional)"
             value={note}
             onChange={(e) => setNote(e.target.value)}
-            className="w-full border p-2 rounded mb-3"
+            className="w-full border p-2 rounded mb-3 text-black"
           />
 
           <select
@@ -168,7 +179,7 @@ export default function Home() {
             onChange={(e) =>
               setType(e.target.value as "toMe" | "iOwe")
             }
-            className="w-full border p-2 rounded mb-3"
+            className="w-full border p-2 rounded mb-3 text-black"
           >
             <option value="toMe">Andere schulden mir</option>
             <option value="iOwe">Ich schulde anderen</option>
@@ -182,17 +193,21 @@ export default function Home() {
           </button>
         </div>
 
-        {/* 🔥 Übersicht */}
+        {/* Übersicht */}
         <div className="grid grid-cols-2 gap-4 mb-8">
           <div className="bg-white p-6 rounded-xl shadow">
-            <p className="text-gray-500">Forderungen</p>
+            <p className="text-gray-600 font-medium">
+              Forderungen
+            </p>
             <p className="text-2xl font-bold text-green-700">
               {toMeTotal} €
             </p>
           </div>
 
           <div className="bg-white p-6 rounded-xl shadow">
-            <p className="text-gray-500">Verbindlichkeiten</p>
+            <p className="text-gray-600 font-medium">
+              Verbindlichkeiten
+            </p>
             <p className="text-2xl font-bold text-red-700">
               {iOweTotal} €
             </p>
@@ -208,7 +223,7 @@ export default function Home() {
               <div key={entry.id} className="p-5 border-b">
                 <div className="flex justify-between">
                   <div>
-                    <div className="font-semibold text-lg">
+                    <div className="font-semibold text-lg text-black">
                       {entry.person}
                     </div>
 
@@ -217,57 +232,37 @@ export default function Home() {
                         Vermerk: {entry.note}
                       </div>
                     )}
-
-                    <div
-                      className={`text-xs font-medium inline-block px-2 py-1 rounded-full mt-1 ${
-                        entry.type === "toMe"
-                          ? "bg-green-100 text-green-700"
-                          : "bg-red-100 text-red-700"
-                      }`}
-                    >
-                      {entry.type === "toMe"
-                        ? "Schuldet mir"
-                        : "Ich schulde"}
-                    </div>
                   </div>
 
-                  <div className="text-right">
-                    <div className="text-lg font-bold">
-                      {remaining} €
-                    </div>
+                  <div className="text-right font-bold text-black">
+                    {remaining} €
                   </div>
                 </div>
 
                 {/* Zahlungen */}
-                {entry.payments &&
-                  entry.payments.length > 0 && (
-                    <div className="mt-3 text-sm text-gray-600 space-y-1">
-                      {entry.payments.map((p) => (
-                        <div key={p.id}>
-                          ✔ Erfolgte Zahlung von{" "}
-                          <span className="font-medium">
-                            {p.amount} €
-                          </span>{" "}
-                          am{" "}
-                          {new Date(
-                            p.payment_date
-                          ).toLocaleDateString("de-DE")}
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                {entry.payments?.map((p) => (
+                  <div
+                    key={p.id}
+                    className="text-sm text-gray-600 mt-1"
+                  >
+                    ✔ Erfolgte Zahlung von {p.amount} € am{" "}
+                    {new Date(
+                      p.payment_date
+                    ).toLocaleDateString("de-DE")}
+                  </div>
+                ))}
 
                 {/* Neue Zahlung */}
                 <div className="flex gap-2 mt-3">
                   <input
                     type="number"
                     placeholder="Betrag"
-                    className="border rounded px-2 py-1 w-24"
+                    className="border rounded px-2 py-1 w-24 text-black"
                     id={`amount-${entry.id}`}
                   />
                   <input
                     type="date"
-                    className="border rounded px-2 py-1"
+                    className="border rounded px-2 py-1 text-black"
                     id={`date-${entry.id}`}
                   />
                   <button
@@ -310,6 +305,7 @@ export default function Home() {
   );
 }
 
+// 🔐 Login mit deutlich sichtbarem Text
 function Login({ onLogin }: any) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -330,8 +326,8 @@ function Login({ onLogin }: any) {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100">
-      <div className="bg-white p-6 rounded-xl shadow w-80">
-        <h2 className="text-xl font-bold mb-4 text-center">
+      <div className="bg-white p-8 rounded-2xl shadow w-80">
+        <h2 className="text-2xl font-bold mb-6 text-center text-black">
           Login
         </h2>
 
@@ -340,7 +336,7 @@ function Login({ onLogin }: any) {
           placeholder="Email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          className="w-full border p-2 rounded mb-3"
+          className="w-full border p-2 rounded mb-4 text-black"
         />
 
         <input
@@ -348,12 +344,12 @@ function Login({ onLogin }: any) {
           placeholder="Passwort"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          className="w-full border p-2 rounded mb-3"
+          className="w-full border p-2 rounded mb-4 text-black"
         />
 
         <button
           onClick={handleLogin}
-          className="w-full bg-blue-600 text-white p-2 rounded"
+          className="w-full bg-blue-600 text-white p-2 rounded font-medium"
         >
           Einloggen
         </button>
