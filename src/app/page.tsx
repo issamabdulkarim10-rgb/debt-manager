@@ -29,6 +29,27 @@ export default function Home() {
   const [amount, setAmount] = useState("");
   const [note, setNote] = useState("");
   const [type, setType] = useState<"toMe" | "iOwe">("toMe");
+  const [dark, setDark] = useState(false);
+
+  // 🌙 Theme laden
+  useEffect(() => {
+    const saved = localStorage.getItem("theme");
+    if (saved === "dark") {
+      document.documentElement.classList.add("dark");
+      setDark(true);
+    }
+  }, []);
+
+  const toggleTheme = () => {
+    if (dark) {
+      document.documentElement.classList.remove("dark");
+      localStorage.setItem("theme", "light");
+    } else {
+      document.documentElement.classList.add("dark");
+      localStorage.setItem("theme", "dark");
+    }
+    setDark(!dark);
+  };
 
   // 🔐 Session prüfen
   useEffect(() => {
@@ -36,30 +57,15 @@ export default function Home() {
       const { data } = await supabase.auth.getSession();
       setUser(data.session?.user ?? null);
     };
-
     getSession();
-
-    const { data: listener } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
-        setUser(session?.user ?? null);
-      }
-    );
-
-    return () => {
-      listener.subscription.unsubscribe();
-    };
   }, []);
 
-  // 📥 Einträge + Zahlungen laden
   const fetchEntries = async () => {
     if (!user) return;
 
     const { data } = await supabase
       .from("entries")
-      .select(`
-        *,
-        payments (*)
-      `)
+      .select(`*, payments(*)`)
       .eq("user_id", user.id)
       .order("created_at", { ascending: false });
 
@@ -70,7 +76,6 @@ export default function Home() {
     if (user) fetchEntries();
   }, [user]);
 
-  // ➕ Neue Schuld
   const addEntry = async () => {
     if (!person || !amount || !user) return;
 
@@ -90,7 +95,6 @@ export default function Home() {
     setNote("");
   };
 
-  // 💰 Zahlung hinzufügen
   const addPayment = async (
     entry: Entry,
     paymentAmount: number,
@@ -110,13 +114,11 @@ export default function Home() {
     fetchEntries();
   };
 
-  // ❌ Löschen
   const deleteEntry = async (id: string) => {
     await supabase.from("entries").delete().eq("id", id);
     fetchEntries();
   };
 
-  // 📊 Restbetrag
   const getRemaining = (entry: Entry) => {
     const totalPaid =
       entry.payments?.reduce((sum, p) => sum + p.amount, 0) || 0;
@@ -135,30 +137,39 @@ export default function Home() {
   if (!user) return <Login onLogin={setUser} />;
 
   return (
-    <main className="min-h-screen bg-gray-50 text-black p-6">
+    <main className="min-h-screen bg-gray-100 dark:bg-gray-900 text-black dark:text-white p-6 transition-colors">
       <div className="max-w-3xl mx-auto">
 
-        {/* Header */}
         <div className="flex justify-between mb-8">
           <h1 className="text-2xl font-bold">
             Schulden Manager
           </h1>
-          <button
-            onClick={() => supabase.auth.signOut()}
-            className="text-sm text-gray-600 hover:underline"
-          >
-            Logout
-          </button>
+
+          <div className="flex gap-4 items-center">
+            <button
+              onClick={toggleTheme}
+              className="text-sm px-3 py-1 border rounded"
+            >
+              {dark ? "☀ Light" : "🌙 Dark"}
+            </button>
+
+            <button
+              onClick={() => supabase.auth.signOut()}
+              className="text-sm opacity-70 hover:opacity-100"
+            >
+              Logout
+            </button>
+          </div>
         </div>
 
         {/* Formular */}
-        <div className="bg-white p-6 rounded-xl border shadow-sm mb-8">
+        <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow mb-8 transition-colors">
           <input
             type="text"
             placeholder="Name"
             value={person}
             onChange={(e) => setPerson(e.target.value)}
-            className="w-full border p-2 rounded mb-3"
+            className="w-full border dark:border-gray-600 bg-white dark:bg-gray-700 p-2 rounded mb-3"
           />
 
           <input
@@ -166,7 +177,7 @@ export default function Home() {
             placeholder="Betrag in €"
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
-            className="w-full border p-2 rounded mb-3"
+            className="w-full border dark:border-gray-600 bg-white dark:bg-gray-700 p-2 rounded mb-3"
           />
 
           <input
@@ -174,7 +185,7 @@ export default function Home() {
             placeholder="Vermerk (optional)"
             value={note}
             onChange={(e) => setNote(e.target.value)}
-            className="w-full border p-2 rounded mb-3"
+            className="w-full border dark:border-gray-600 bg-white dark:bg-gray-700 p-2 rounded mb-3"
           />
 
           <select
@@ -182,7 +193,7 @@ export default function Home() {
             onChange={(e) =>
               setType(e.target.value as "toMe" | "iOwe")
             }
-            className="w-full border p-2 rounded mb-3"
+            className="w-full border dark:border-gray-600 bg-white dark:bg-gray-700 p-2 rounded mb-3"
           >
             <option value="toMe">Andere schulden mir</option>
             <option value="iOwe">Ich schulde anderen</option>
@@ -190,7 +201,7 @@ export default function Home() {
 
           <button
             onClick={addEntry}
-            className="w-full bg-blue-600 text-white p-2 rounded"
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white p-2 rounded"
           >
             Hinzufügen
           </button>
@@ -198,130 +209,21 @@ export default function Home() {
 
         {/* Übersicht */}
         <div className="grid grid-cols-2 gap-4 mb-8">
-          <div className="bg-white p-6 rounded-xl border shadow-sm">
+          <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow">
             <p>Ich bekomme</p>
-            <p className="text-2xl font-bold text-green-700">
+            <p className="text-2xl font-bold text-green-500">
               {toMeTotal} €
             </p>
           </div>
 
-          <div className="bg-white p-6 rounded-xl border shadow-sm">
+          <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow">
             <p>Ich schulde</p>
-            <p className="text-2xl font-bold text-red-700">
+            <p className="text-2xl font-bold text-red-500">
               {iOweTotal} €
             </p>
           </div>
         </div>
 
-        {/* Liste */}
-        <div className="bg-white rounded-xl shadow border">
-          {entries.map((entry) => {
-            const remaining = getRemaining(entry);
-
-            return (
-              <div key={entry.id} className="p-5 border-b">
-                <div className="flex justify-between">
-                  <div>
-                    <div className="font-semibold text-lg">
-                      {entry.person}
-                    </div>
-
-                    <div className="mt-1 space-y-1">
-
-                      {entry.note && (
-                        <div className="text-sm text-gray-500 italic">
-                          Vermerk: {entry.note}
-                        </div>
-                      )}
-
-                      <div
-                        className={`text-xs font-medium inline-block px-2 py-1 rounded-full ${
-                          entry.type === "toMe"
-                            ? "bg-green-100 text-green-700"
-                            : "bg-red-100 text-red-700"
-                        }`}
-                      >
-                        {entry.type === "toMe"
-                          ? "Schuldet mir"
-                          : "Ich schulde"}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="text-right">
-                    <div className="text-lg font-bold">
-                      {remaining} €
-                    </div>
-                  </div>
-                </div>
-
-                {/* Zahlungen */}
-                {entry.payments &&
-                  entry.payments.length > 0 && (
-                    <div className="mt-3 text-sm text-gray-600 space-y-1">
-                      {entry.payments.map((p) => (
-                        <div key={p.id}>
-                          ✔ Erfolgte Zahlung von{" "}
-                          <span className="font-medium">
-                            {p.amount} €
-                          </span>{" "}
-                          am{" "}
-                          {new Date(
-                            p.payment_date
-                          ).toLocaleDateString("de-DE")}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                {/* Neue Zahlung */}
-                <div className="flex gap-2 mt-3">
-                  <input
-                    type="number"
-                    placeholder="Betrag"
-                    className="border rounded px-2 py-1 w-24"
-                    id={`amount-${entry.id}`}
-                  />
-                  <input
-                    type="date"
-                    className="border rounded px-2 py-1"
-                    id={`date-${entry.id}`}
-                  />
-                  <button
-                    onClick={() => {
-                      const amount = Number(
-                        (
-                          document.getElementById(
-                            `amount-${entry.id}`
-                          ) as HTMLInputElement
-                        ).value
-                      );
-                      const date = (
-                        document.getElementById(
-                          `date-${entry.id}`
-                        ) as HTMLInputElement
-                      ).value;
-
-                      if (amount > 0 && date) {
-                        addPayment(entry, amount, date);
-                      }
-                    }}
-                    className="text-blue-600"
-                  >
-                    Zahlung speichern
-                  </button>
-
-                  <button
-                    onClick={() => deleteEntry(entry.id)}
-                    className="text-red-600"
-                  >
-                    Löschen
-                  </button>
-                </div>
-              </div>
-            );
-          })}
-        </div>
       </div>
     </main>
   );
@@ -346,8 +248,8 @@ function Login({ onLogin }: any) {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <div className="bg-white border shadow-sm p-8 rounded-xl w-80">
+    <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900">
+      <div className="bg-white dark:bg-gray-800 p-8 rounded-xl shadow w-80">
         <h2 className="text-xl font-bold mb-6 text-center">
           Login
         </h2>
@@ -357,7 +259,7 @@ function Login({ onLogin }: any) {
           placeholder="Email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          className="w-full border p-2 rounded mb-3"
+          className="w-full border dark:border-gray-600 bg-white dark:bg-gray-700 p-2 rounded mb-3"
         />
 
         <input
@@ -365,12 +267,12 @@ function Login({ onLogin }: any) {
           placeholder="Passwort"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          className="w-full border p-2 rounded mb-4"
+          className="w-full border dark:border-gray-600 bg-white dark:bg-gray-700 p-2 rounded mb-4"
         />
 
         <button
           onClick={handleLogin}
-          className="w-full bg-blue-600 text-white p-2 rounded"
+          className="w-full bg-blue-600 hover:bg-blue-700 text-white p-2 rounded"
         >
           Einloggen
         </button>
