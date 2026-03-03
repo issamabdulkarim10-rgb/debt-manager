@@ -70,7 +70,7 @@ export default function Home() {
     if (user) fetchEntries();
   }, [user]);
 
-  // ➕ Neue Schuld
+  // ➕ Neue Schuld hinzufügen
   const addEntry = async () => {
     if (!person || !amount || !user) return;
 
@@ -90,7 +90,7 @@ export default function Home() {
     setNote("");
   };
 
-  // 💰 Zahlung hinzufügen
+  // 💰 Teilzahlung hinzufügen
   const addPayment = async (
     entry: Entry,
     paymentAmount: number,
@@ -110,16 +110,19 @@ export default function Home() {
     fetchEntries();
   };
 
-  // ❌ Löschen
+  // ❌ Schuld löschen
   const deleteEntry = async (id: string) => {
     await supabase.from("entries").delete().eq("id", id);
     fetchEntries();
   };
 
-  // 📊 Restbetrag
+  // 📊 Restbetrag berechnen
   const getRemaining = (entry: Entry) => {
     const totalPaid =
-      entry.payments?.reduce((sum, p) => sum + p.amount, 0) || 0;
+      entry.payments?.reduce(
+        (sum, p) => sum + p.amount,
+        0
+      ) || 0;
 
     return entry.amount - totalPaid;
   };
@@ -144,7 +147,9 @@ export default function Home() {
             Schulden Manager
           </h1>
           <button
-            onClick={() => supabase.auth.signOut()}
+            onClick={() =>
+              supabase.auth.signOut()
+            }
             className="text-sm text-gray-600 hover:underline"
           >
             Logout
@@ -157,7 +162,9 @@ export default function Home() {
             type="text"
             placeholder="Name"
             value={person}
-            onChange={(e) => setPerson(e.target.value)}
+            onChange={(e) =>
+              setPerson(e.target.value)
+            }
             className="w-full border p-2 rounded mb-3"
           />
 
@@ -165,27 +172,39 @@ export default function Home() {
             type="number"
             placeholder="Betrag in €"
             value={amount}
-            onChange={(e) => setAmount(e.target.value)}
+            onChange={(e) =>
+              setAmount(e.target.value)
+            }
             className="w-full border p-2 rounded mb-3"
           />
 
           <input
             type="text"
-            placeholder="Vermerk (optional)"
+            placeholder="Notiz (optional)"
             value={note}
-            onChange={(e) => setNote(e.target.value)}
+            onChange={(e) =>
+              setNote(e.target.value)
+            }
             className="w-full border p-2 rounded mb-3"
           />
 
           <select
             value={type}
             onChange={(e) =>
-              setType(e.target.value as "toMe" | "iOwe")
+              setType(
+                e.target.value as
+                  | "toMe"
+                  | "iOwe"
+              )
             }
             className="w-full border p-2 rounded mb-3"
           >
-            <option value="toMe">Andere schulden mir</option>
-            <option value="iOwe">Ich schulde anderen</option>
+            <option value="toMe">
+              Andere schulden mir
+            </option>
+            <option value="iOwe">
+              Ich schulde anderen
+            </option>
           </select>
 
           <button
@@ -219,32 +238,26 @@ export default function Home() {
             const remaining = getRemaining(entry);
 
             return (
-              <div key={entry.id} className="p-5 border-b">
+              <div
+                key={entry.id}
+                className="p-5 border-b"
+              >
                 <div className="flex justify-between">
                   <div>
                     <div className="font-semibold text-lg">
                       {entry.person}
                     </div>
 
-                    <div className="mt-1 space-y-1">
-
-                      {entry.note && (
-                        <div className="text-sm text-gray-500 italic">
-                          Vermerk: {entry.note}
-                        </div>
-                      )}
-
-                      <div
-                        className={`text-xs font-medium inline-block px-2 py-1 rounded-full ${
-                          entry.type === "toMe"
-                            ? "bg-green-100 text-green-700"
-                            : "bg-red-100 text-red-700"
-                        }`}
-                      >
-                        {entry.type === "toMe"
-                          ? "Schuldet mir"
-                          : "Ich schulde"}
+                    {entry.note && (
+                      <div className="text-sm text-gray-500">
+                        {entry.note}
                       </div>
+                    )}
+
+                    <div className="text-sm text-gray-500">
+                      {entry.type === "toMe"
+                        ? "Schuldet mir"
+                        : "Ich schulde"}
                     </div>
                   </div>
 
@@ -255,26 +268,27 @@ export default function Home() {
                   </div>
                 </div>
 
-                {/* Zahlungen */}
+                {/* Zahlungen anzeigen */}
                 {entry.payments &&
-                  entry.payments.length > 0 && (
-                    <div className="mt-3 text-sm text-gray-600 space-y-1">
-                      {entry.payments.map((p) => (
-                        <div key={p.id}>
-                          ✔ Erfolgte Zahlung von{" "}
-                          <span className="font-medium">
-                            {p.amount} €
-                          </span>{" "}
-                          am{" "}
-                          {new Date(
-                            p.payment_date
-                          ).toLocaleDateString("de-DE")}
-                        </div>
-                      ))}
+                  entry.payments.length >
+                    0 && (
+                    <div className="mt-3 text-sm text-gray-600">
+                      {entry.payments.map(
+                        (p) => (
+                          <div key={p.id} className="text-sm text-gray-600">
+  ✔ Erfolgte Zahlung von{" "}
+  <span className="font-medium">
+    {p.amount} €
+  </span>{" "}
+  am{" "}
+  {new Date(p.payment_date).toLocaleDateString("de-DE")}
+</div>
+                        )
+                      )}
                     </div>
                   )}
 
-                {/* Neue Zahlung */}
+                {/* Neue Teilzahlung */}
                 <div className="flex gap-2 mt-3">
                   <input
                     type="number"
@@ -289,21 +303,29 @@ export default function Home() {
                   />
                   <button
                     onClick={() => {
-                      const amount = Number(
-                        (
-                          document.getElementById(
-                            `amount-${entry.id}`
-                          ) as HTMLInputElement
-                        ).value
-                      );
+                      const amount =
+                        Number(
+                          (
+                            document.getElementById(
+                              `amount-${entry.id}`
+                            ) as HTMLInputElement
+                          ).value
+                        );
                       const date = (
                         document.getElementById(
                           `date-${entry.id}`
                         ) as HTMLInputElement
                       ).value;
 
-                      if (amount > 0 && date) {
-                        addPayment(entry, amount, date);
+                      if (
+                        amount > 0 &&
+                        date
+                      ) {
+                        addPayment(
+                          entry,
+                          amount,
+                          date
+                        );
                       }
                     }}
                     className="text-blue-600"
@@ -312,7 +334,9 @@ export default function Home() {
                   </button>
 
                   <button
-                    onClick={() => deleteEntry(entry.id)}
+                    onClick={() =>
+                      deleteEntry(entry.id)
+                    }
                     className="text-red-600"
                   >
                     Löschen
@@ -327,9 +351,11 @@ export default function Home() {
   );
 }
 
+// 🔐 Login
 function Login({ onLogin }: any) {
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [password, setPassword] =
+    useState("");
 
   const handleLogin = async () => {
     const { data, error } =
@@ -356,7 +382,9 @@ function Login({ onLogin }: any) {
           type="email"
           placeholder="Email"
           value={email}
-          onChange={(e) => setEmail(e.target.value)}
+          onChange={(e) =>
+            setEmail(e.target.value)
+          }
           className="w-full border p-2 rounded mb-3"
         />
 
@@ -364,7 +392,9 @@ function Login({ onLogin }: any) {
           type="password"
           placeholder="Passwort"
           value={password}
-          onChange={(e) => setPassword(e.target.value)}
+          onChange={(e) =>
+            setPassword(e.target.value)
+          }
           className="w-full border p-2 rounded mb-4"
         />
 
