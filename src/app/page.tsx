@@ -118,8 +118,6 @@ export default function Home() {
     .filter((e) => e.type === "iOwe")
     .reduce((sum, e) => sum + getRemaining(e), 0);
 
-  const saldo = toMeTotal - iOweTotal;
-
   if (!user) return <Login onLogin={setUser} />;
 
   return (
@@ -184,29 +182,20 @@ export default function Home() {
           </button>
         </div>
 
-        {/* 🔥 Saldo Box */}
-        <div className="bg-white p-8 rounded-2xl shadow mb-8 text-center">
-          <p className="text-gray-500 text-sm uppercase tracking-wide">
-            Saldo
-          </p>
+        {/* 🔥 Übersicht */}
+        <div className="grid grid-cols-2 gap-4 mb-8">
+          <div className="bg-white p-6 rounded-xl shadow">
+            <p className="text-gray-500">Forderungen</p>
+            <p className="text-2xl font-bold text-green-700">
+              {toMeTotal} €
+            </p>
+          </div>
 
-          <p
-            className={`text-4xl font-bold mt-2 ${
-              saldo >= 0 ? "text-green-600" : "text-red-600"
-            }`}
-          >
-            {saldo >= 0 ? "+" : ""}
-            {saldo} €
-          </p>
-
-          <div className="mt-4 text-sm text-gray-500">
-            <span className="text-green-600 font-medium">
-              {toMeTotal} € offen
-            </span>
-            {" · "}
-            <span className="text-red-600 font-medium">
-              {iOweTotal} € schulde ich
-            </span>
+          <div className="bg-white p-6 rounded-xl shadow">
+            <p className="text-gray-500">Verbindlichkeiten</p>
+            <p className="text-2xl font-bold text-red-700">
+              {iOweTotal} €
+            </p>
           </div>
         </div>
 
