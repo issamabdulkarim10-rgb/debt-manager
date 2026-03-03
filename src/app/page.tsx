@@ -275,10 +275,14 @@ export default function Home() {
                     <div className="mt-3 text-sm text-gray-600">
                       {entry.payments.map(
                         (p) => (
-                          <div key={p.id}>
-                            Zahlung {p.amount} €
-                            am {p.payment_date}
-                          </div>
+                          <div key={p.id} className="text-sm text-gray-600">
+  ✔ Erfolgte Zahlung von{" "}
+  <span className="font-medium">
+    {p.amount} €
+  </span>{" "}
+  am{" "}
+  {new Date(p.payment_date).toLocaleDateString("de-DE")}
+</div>
                         )
                       )}
                     </div>
