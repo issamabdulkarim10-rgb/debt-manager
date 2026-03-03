@@ -16,6 +16,7 @@ type Entry = {
   person: string;
   amount: number;
   type: "toMe" | "iOwe";
+  note: string | null;
   user_id: string;
   created_at: string;
   payments?: Payment[];
@@ -26,6 +27,7 @@ export default function Home() {
   const [entries, setEntries] = useState<Entry[]>([]);
   const [person, setPerson] = useState("");
   const [amount, setAmount] = useState("");
+  const [note, setNote] = useState("");
   const [type, setType] = useState<"toMe" | "iOwe">("toMe");
 
   // 🔐 Session prüfen
@@ -68,7 +70,7 @@ export default function Home() {
     if (user) fetchEntries();
   }, [user]);
 
-  // ➕ Neuer Eintrag
+  // ➕ Neue Schuld hinzufügen
   const addEntry = async () => {
     if (!person || !amount || !user) return;
 
@@ -77,6 +79,7 @@ export default function Home() {
         person,
         amount: Number(amount),
         type,
+        note: note || null,
         user_id: user.id,
       },
     ]);
@@ -84,9 +87,10 @@ export default function Home() {
     fetchEntries();
     setPerson("");
     setAmount("");
+    setNote("");
   };
 
-  // 💰 Zahlung hinzufügen
+  // 💰 Teilzahlung hinzufügen
   const addPayment = async (
     entry: Entry,
     paymentAmount: number,
@@ -106,7 +110,7 @@ export default function Home() {
     fetchEntries();
   };
 
-  // ❌ Löschen
+  // ❌ Schuld löschen
   const deleteEntry = async (id: string) => {
     await supabase.from("entries").delete().eq("id", id);
     fetchEntries();
@@ -137,6 +141,7 @@ export default function Home() {
     <main className="min-h-screen bg-gray-50 text-black p-6">
       <div className="max-w-3xl mx-auto">
 
+        {/* Header */}
         <div className="flex justify-between mb-8">
           <h1 className="text-2xl font-bold">
             Schulden Manager
@@ -169,6 +174,16 @@ export default function Home() {
             value={amount}
             onChange={(e) =>
               setAmount(e.target.value)
+            }
+            className="w-full border p-2 rounded mb-3"
+          />
+
+          <input
+            type="text"
+            placeholder="Notiz (optional)"
+            value={note}
+            onChange={(e) =>
+              setNote(e.target.value)
             }
             className="w-full border p-2 rounded mb-3"
           />
@@ -232,6 +247,13 @@ export default function Home() {
                     <div className="font-semibold text-lg">
                       {entry.person}
                     </div>
+
+                    {entry.note && (
+                      <div className="text-sm text-gray-500">
+                        {entry.note}
+                      </div>
+                    )}
+
                     <div className="text-sm text-gray-500">
                       {entry.type === "toMe"
                         ? "Schuldet mir"
@@ -246,7 +268,7 @@ export default function Home() {
                   </div>
                 </div>
 
-                {/* Zahlungen */}
+                {/* Zahlungen anzeigen */}
                 {entry.payments &&
                   entry.payments.length >
                     0 && (
@@ -262,7 +284,7 @@ export default function Home() {
                     </div>
                   )}
 
-                {/* Neue Zahlung */}
+                {/* Neue Teilzahlung */}
                 <div className="flex gap-2 mt-3">
                   <input
                     type="number"
@@ -325,6 +347,7 @@ export default function Home() {
   );
 }
 
+// 🔐 Login
 function Login({ onLogin }: any) {
   const [email, setEmail] = useState("");
   const [password, setPassword] =
