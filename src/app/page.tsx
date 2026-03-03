@@ -30,7 +30,7 @@ export default function Home() {
   const [note, setNote] = useState("");
   const [type, setType] = useState<"toMe" | "iOwe">("toMe");
 
-  // 🔐 Auth Listener (wichtig für Logout!)
+  // 🔐 Auth Listener (wichtig für Logout)
   useEffect(() => {
     const getSession = async () => {
       const { data } = await supabase.auth.getSession();
@@ -137,7 +137,7 @@ export default function Home() {
 
         {/* Header */}
         <div className="flex justify-between mb-8">
-          <h1 className="text-2xl font-bold text-black">
+          <h1 className="text-2xl font-bold">
             Schulden Manager
           </h1>
           <button
@@ -223,18 +223,31 @@ export default function Home() {
               <div key={entry.id} className="p-5 border-b">
                 <div className="flex justify-between">
                   <div>
-                    <div className="font-semibold text-lg text-black">
+                    <div className="font-semibold text-lg">
                       {entry.person}
                     </div>
 
+                    {/* Badge wieder sichtbar */}
+                    <div
+                      className={`text-xs font-medium inline-block px-2 py-1 rounded-full mt-1 ${
+                        entry.type === "toMe"
+                          ? "bg-green-100 text-green-700"
+                          : "bg-red-100 text-red-700"
+                      }`}
+                    >
+                      {entry.type === "toMe"
+                        ? "Schuldet mir"
+                        : "Ich schulde"}
+                    </div>
+
                     {entry.note && (
-                      <div className="text-sm text-gray-500 italic">
+                      <div className="text-sm text-gray-500 italic mt-1">
                         Vermerk: {entry.note}
                       </div>
                     )}
                   </div>
 
-                  <div className="text-right font-bold text-black">
+                  <div className="text-right font-bold">
                     {remaining} €
                   </div>
                 </div>
@@ -305,7 +318,7 @@ export default function Home() {
   );
 }
 
-// 🔐 Login mit deutlich sichtbarem Text
+// 🔐 Login
 function Login({ onLogin }: any) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
